@@ -1,0 +1,24 @@
+{
+  "name": "tds-project-1",
+  "version": "1.0.0",
+  "description": "LLM Code Deployment System for TDS Project 1",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node test-request.js",
+    "test:round2": "node test-request.js --round=2",
+    "setup": "node setup.js",
+    "verify": "node verify-setup.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^19.0.13",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
