@@ -1,15 +1,30 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "index.js",
-      "use": "@vercel/node"
+  "functions": {
+    "api/deploy.js": {
+      "maxDuration": 10
+    },
+    "api/health.js": {
+      "maxDuration": 5
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "index.js"
+      "source": "/api/deploy",
+      "destination": "/api/deploy.js"
+    },
+    {
+      "source": "/api/health", 
+      "destination": "/api/health.js"
     }
   ]
 }
+```
+
+### 4. **Update your `.env` file**
+
+Make sure it has:
+```
+ANTHROPIC_API_KEY=your_claude_api_key_here
+GITHUB_TOKEN=your_github_token_here
+GITHUB_USERNAME=your_github_username_here
+SECRET_KEY=my-secret-deployment-key-123
