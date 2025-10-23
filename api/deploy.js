@@ -1,10 +1,9 @@
-// api/deploy.js
+// api/deploy.js - OpenAI Version
 export const config = {
-  maxDuration: 300, // 5 minutes for Pro plan, 10s for free
+  maxDuration: 10,
 };
 
 export default async function handler(req, res) {
-  // Only accept POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,17 +11,14 @@ export default async function handler(req, res) {
   try {
     const { email, secret, task, round, nonce, brief, checks, evaluation_url, attachments } = req.body;
 
-    // CRITICAL: Verify secret first
     if (secret !== 'my-secret-deployment-key-123') {
       return res.status(403).json({ error: 'Invalid secret' });
     }
 
-    // Validate required fields
     if (!email || !task || !round || !nonce || !brief || !evaluation_url) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Return 200 IMMEDIATELY to avoid timeout
     res.status(200).json({ 
       status: 'accepted',
       message: 'Request received and processing',
@@ -30,7 +26,6 @@ export default async function handler(req, res) {
       round
     });
 
-    // Process asynchronously (continues after response sent)
     setImmediate(async () => {
       try {
         await processDeployment({ email, task, round, nonce, brief, checks, evaluation_url, attachments });
@@ -49,19 +44,14 @@ async function processDeployment(data) {
   const { email, task, round, nonce, brief, checks, evaluation_url, attachments } = data;
   
   try {
-    console.log(`Starting deployment for ${email}, task: ${task}, round: ${round}`);
+    console.log(\`Starting deployment for \${email}, task: \${task}, round: \${round}\`);
 
-    // Step 1: Generate app code using LLM
     const appCode = await generateAppWithLLM(brief, attachments, checks);
-
-    // Step 2: Create GitHub repo
-    const repoName = `${task}-round${round}`.replace(/[^a-zA-Z0-9-]/g, '-');
+    const repoName = \`\${task}-round\${round}\`.replace(/[^a-zA-Z0-9-]/g, '-');
     const { repoUrl, commitSha, pagesUrl } = await createAndDeployToGitHub(repoName, appCode, brief);
-
-    // Step 3: Wait a bit for Pages to deploy
-    await new Promise(resolve => setTimeout(resolve, 30000)); // 30 seconds
-
-    // Step 4: Notify evaluation API with retries
+    
+    await new Promise(resolve => setTimeout(resolve, 30000));
+    
     await notifyEvaluationAPI(evaluation_url, {
       email,
       task,
@@ -72,7 +62,7 @@ async function processDeployment(data) {
       pages_url: pagesUrl
     });
 
-    console.log(`Successfully deployed ${task} for ${email}`);
+    console.log(\`Successfully deployed \${task} for \${email}\`);
 
   } catch (error) {
     console.error('Deployment error:', error);
@@ -81,16 +71,15 @@ async function processDeployment(data) {
 }
 
 async function generateAppWithLLM(brief, attachments, checks) {
-  // Use Claude/OpenAI API to generate app code
-  const prompt = `Generate a complete, single-file HTML application based on this brief:
+  const prompt = \`Generate a complete, single-file HTML application based on this brief:
 
-${brief}
+\${brief}
 
 Requirements:
-${checks.map(c => `- ${c}`).join('\n')}
+\${checks.map(c => \`- \${c}\`).join('\\n')}
 
-${attachments && attachments.length > 0 ? `Attachments provided:
-${attachments.map(a => `- ${a.name}`).join('\n')}` : ''}
+\${attachments && attachments.length > 0 ? \`Attachments provided:
+\${attachments.map(a => \`- \${a.name}\`).join('\\n')}\` : ''}
 
 Generate a single HTML file with embedded CSS and JavaScript. Include:
 - All necessary CDN links for libraries
@@ -98,29 +87,32 @@ Generate a single HTML file with embedded CSS and JavaScript. Include:
 - Comments explaining key sections
 - Responsive design with Bootstrap if mentioned
 
-Return ONLY the HTML code, no explanations.`;
+Return ONLY the HTML code, no explanations.\`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
+      'Authorization': \`Bearer \${process.env.OPENAI_API_KEY}\`
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      model: 'gpt-4',
       messages: [{
         role: 'user',
         content: prompt
-      }]
+      }],
+      temperature: 0.7,
+      max_tokens: 4096
     })
   });
 
   const data = await response.json();
-  const htmlCode = data.content[0].text;
+  
+  if (!response.ok) {
+    throw new Error(\`OpenAI API error: \${data.error?.message || 'Unknown error'}\`);
+  }
 
-  // Generate README
+  const htmlCode = data.choices[0].message.content;
   const readme = generateReadme(brief, checks);
 
   return {
@@ -138,11 +130,10 @@ async function createAndDeployToGitHub(repoName, files, brief) {
     throw new Error('GitHub credentials not configured');
   }
 
-  // 1. Create repository
   const createRepoResponse = await fetch('https://api.github.com/user/repos', {
     method: 'POST',
     headers: {
-      'Authorization': `token ${token}`,
+      'Authorization': \`token \${token}\`,
       'Content-Type': 'application/json',
       'User-Agent': 'DeploymentBot'
     },
@@ -156,32 +147,30 @@ async function createAndDeployToGitHub(repoName, files, brief) {
 
   if (!createRepoResponse.ok) {
     const error = await createRepoResponse.json();
-    throw new Error(`Failed to create repo: ${error.message}`);
+    throw new Error(\`Failed to create repo: \${error.message}\`);
   }
 
   const repo = await createRepoResponse.json();
 
-  // 2. Create files using GitHub API
   for (const [filename, content] of Object.entries(files)) {
-    await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filename}`, {
+    await fetch(\`https://api.github.com/repos/\${username}/\${repoName}/contents/\${filename}\`, {
       method: 'PUT',
       headers: {
-        'Authorization': `token ${token}`,
+        'Authorization': \`token \${token}\`,
         'Content-Type': 'application/json',
         'User-Agent': 'DeploymentBot'
       },
       body: JSON.stringify({
-        message: `Add ${filename}`,
+        message: \`Add \${filename}\`,
         content: Buffer.from(content).toString('base64')
       })
     });
   }
 
-  // 3. Enable GitHub Pages
-  await fetch(`https://api.github.com/repos/${username}/${repoName}/pages`, {
+  await fetch(\`https://api.github.com/repos/\${username}/\${repoName}/pages\`, {
     method: 'POST',
     headers: {
-      'Authorization': `token ${token}`,
+      'Authorization': \`token \${token}\`,
       'Content-Type': 'application/json',
       'User-Agent': 'DeploymentBot',
       'Accept': 'application/vnd.github.switcheroo-preview+json'
@@ -194,10 +183,9 @@ async function createAndDeployToGitHub(repoName, files, brief) {
     })
   });
 
-  // Get latest commit SHA
-  const commitsResponse = await fetch(`https://api.github.com/repos/${username}/${repoName}/commits/main`, {
+  const commitsResponse = await fetch(\`https://api.github.com/repos/\${username}/\${repoName}/commits/main\`, {
     headers: {
-      'Authorization': `token ${token}`,
+      'Authorization': \`token \${token}\`,
       'User-Agent': 'DeploymentBot'
     }
   });
@@ -206,13 +194,13 @@ async function createAndDeployToGitHub(repoName, files, brief) {
   return {
     repoUrl: repo.html_url,
     commitSha: commitData.sha,
-    pagesUrl: `https://${username}.github.io/${repoName}/`
+    pagesUrl: \`https://\${username}.github.io/\${repoName}/\`
   };
 }
 
 async function notifyEvaluationAPI(evaluationUrl, data) {
   const maxRetries = 5;
-  const delays = [1000, 2000, 4000, 8000, 16000]; // Exponential backoff
+  const delays = [1000, 2000, 4000, 8000, 16000];
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -229,9 +217,9 @@ async function notifyEvaluationAPI(evaluationUrl, data) {
         return;
       }
 
-      console.log(`Evaluation API returned ${response.status}, retrying...`);
+      console.log(\`Evaluation API returned \${response.status}, retrying...\`);
     } catch (error) {
-      console.error(`Attempt ${attempt + 1} failed:`, error.message);
+      console.error(\`Attempt \${attempt + 1} failed:\`, error.message);
     }
 
     if (attempt < maxRetries - 1) {
@@ -243,34 +231,34 @@ async function notifyEvaluationAPI(evaluationUrl, data) {
 }
 
 function generateReadme(brief, checks) {
-  return `# Project
+  return \`# Project
 
 ## Summary
-${brief}
+\${brief}
 
 ## Setup
 1. Clone this repository
-2. Open \`index.html\` in a browser or use a local server
+2. Open \\\`index.html\\\` in a browser or use a local server
 
 ## Usage
 Open the page and follow the interface instructions.
 
 ## Requirements Met
-${checks.map(c => `- ${c}`).join('\n')}
+\${checks.map(c => \`- \${c}\`).join('\\n')}
 
 ## Code Explanation
 This application is built as a single HTML file with embedded CSS and JavaScript for simplicity and ease of deployment.
 
 ## License
 MIT License - See LICENSE file for details
-`;
+\`;
 }
 
 function getMITLicense() {
   const year = new Date().getFullYear();
-  return `MIT License
+  return \`MIT License
 
-Copyright (c) ${year}
+Copyright (c) \${year}
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -288,105 +276,5 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.`;
+SOFTWARE.\`;
 }
-
-
-
-
-// const express = require('express');
-// const { Octokit } = require('@octokit/rest');
-// const { Configuration, OpenAIApi } = require('openai');
-// require('dotenv').config();
-
-// const app = express();
-// const port = process.env.PORT || 3000;
-
-// // Middleware
-// app.use(express.json());
-// app.use(require('cors')());
-
-// // Health check endpoint
-// app.get('/health', (req, res) => {
-//   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
-// });
-
-// // Main deployment endpoint
-// app.post('/api/deploy', async (req, res) => {
-//   try {
-//     // Validate request
-//     const { secret, task, round, brief, checks, evaluation_url, attachments } = req.body;
-    
-//     if (secret !== process.env.SECRET_KEY) {
-//       return res.status(401).json({ error: 'Invalid secret key' });
-//     }
-
-//     // Initialize GitHub client
-//     const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-
-//     // Initialize OpenAI
-//     const configuration = new Configuration({
-//       apiKey: process.env.OPENAI_API_KEY,
-//     });
-//     const openai = new OpenAIApi(configuration);
-
-//     // Generate code using OpenAI
-//     const completion = await openai.createCompletion({
-//       model: "text-davinci-003",
-//       prompt: `Create a web application with: ${brief}\n\nRequirements:\n${checks.join('\n')}`,
-//       max_tokens: 1000,
-//     });
-
-//     const generatedCode = completion.data.choices[0].text;
-
-//     // Create GitHub repository
-//     const repoName = `tds-${task}`;
-//     await octokit.repos.createForAuthenticatedUser({
-//       name: repoName,
-//       private: false,
-//       auto_init: true
-//     });
-
-//     // Create initial files
-//     await octokit.repos.createOrUpdateFileContents({
-//       owner: process.env.GITHUB_USERNAME,
-//       repo: repoName,
-//       path: 'index.html',
-//       message: 'Initial commit with generated code',
-//       content: Buffer.from(generatedCode).toString('base64')
-//     });
-
-//     // Enable GitHub Pages
-//     await octokit.repos.createPagesSite({
-//       owner: process.env.GITHUB_USERNAME,
-//       repo: repoName,
-//       source: {
-//         branch: 'main',
-//         path: '/'
-//       }
-//     });
-
-//     // Return success response
-//     res.status(200).json({
-//       success: true,
-//       message: 'Deployment successful',
-//       url: `https://${process.env.GITHUB_USERNAME}.github.io/${repoName}`,
-//       repo: `https://github.com/${process.env.GITHUB_USERNAME}/${repoName}`
-//     });
-
-//   } catch (error) {
-//     console.error('Deployment error:', error);
-//     res.status(500).json({ 
-//       success: false,
-//       error: error.message,
-//       details: error.response?.data || {}
-//     });
-//   }
-// });
-
-// // Start server
-// app.listen(port, () => {
-//   console.log(`Server running on http://localhost:${port}`);
-// });
-
-// module.exports = app;
