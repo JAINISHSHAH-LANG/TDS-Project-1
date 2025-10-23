@@ -1,3 +1,11 @@
+export default function Home() {
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+      <h1>Captcha Solver Project</h1>
+      <p>Your deployment is live!</p>
+    </div>
+  );
+}
 // pages/index.js
 import { useState } from "react";
 
