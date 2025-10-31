@@ -1,0 +1,36 @@
+name: Daily Repository Update
+
+on:
+  schedule:
+    - cron: '30 5 * * *'  # Runs daily at 05:30 UTC (11:00 AM IST)
+  workflow_dispatch:
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add daily commit for 24f1002326@ds.study.iitm.ac.in
+        run: |
+          echo "Last updated on $(date)" > daily_update.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily_update.log
+          git commit -m "Automated daily update: $(date)" || echo "No changes to commit"
+          git push
+<<<<<<< HEAD
+# (This part comes from GitHub’s remote file)
+on:
+  schedule:
+    - cron: '0 6 * * *'
+=======
+# (This part is your local commit)
+on:
+  schedule:
+    - cron: '30 5 * * *'  # Runs daily at 05:30 UTC (11:00 AM IST)
+>>>>>>> 812667a... Fix workflow permissions and stability
