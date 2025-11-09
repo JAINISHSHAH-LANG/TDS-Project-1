@@ -1,0 +1,38 @@
+name: Matrix Build with Artifacts
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Matrix Strategy: 3 variants
+    strategy:
+      matrix:
+        node-version: [14, 16, 18]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Identifier step
+      - name: matrix-8e5f8ba
+        run: echo "Building for Node.js version ${{ matrix.node-version }}"
+
+      # Generate a unique build artifact
+      - name: Generate build artifact
+        run: |
+          echo "Build output for Node.js version ${{ matrix.node-version }}" > build_output.txt
+          echo "Timestamp: $(date)" >> build_output.txt
+          echo "Git commit: \$(git rev-parse --short HEAD || echo 'none')" >> build_output.txt
+          cat build_output.txt
+
+      # Upload artifact with proper prefix
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-8e5f8ba-v${{ matrix.node-version }}
+          path: build_output.txt
